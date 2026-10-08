@@ -1,0 +1,20 @@
+{"id": "q01", "question": "Why is attention expensive for long context windows?", "relevant_docs": ["transformers"], "answer_keywords": ["quadratic"]}
+{"id": "q02", "question": "What does a temperature of 0 do during decoding?", "relevant_docs": ["sampling"], "answer_keywords": ["greedy"]}
+{"id": "q03", "question": "What is nucleus sampling?", "relevant_docs": ["sampling"], "answer_keywords": ["cumulative probability"]}
+{"id": "q04", "question": "How do teams reduce hallucinations?", "relevant_docs": ["sampling", "rag"], "answer_keywords": ["citations"]}
+{"id": "q05", "question": "What are the two phases of a RAG pipeline?", "relevant_docs": ["rag"], "answer_keywords": ["ingestion"]}
+{"id": "q06", "question": "What is the trade-off when choosing chunk size?", "relevant_docs": ["rag"], "answer_keywords": ["context"]}
+{"id": "q07", "question": "Why should retrieval quality be measured separately from answer quality?", "relevant_docs": ["rag", "evaluation"], "answer_keywords": ["retrieval"]}
+{"id": "q08", "question": "When is BM25 better than dense embeddings?", "relevant_docs": ["embeddings"], "answer_keywords": ["exact"]}
+{"id": "q09", "question": "How does reciprocal rank fusion merge result lists?", "relevant_docs": ["embeddings"], "answer_keywords": ["rank"]}
+{"id": "q10", "question": "What is HNSW used for?", "relevant_docs": ["embeddings"], "answer_keywords": ["nearest"]}
+{"id": "q11", "question": "Why is a cross-encoder reranker more accurate than embedding similarity?", "relevant_docs": ["reranking"], "answer_keywords": ["jointly"]}
+{"id": "q12", "question": "What problem does maximal marginal relevance solve?", "relevant_docs": ["reranking"], "answer_keywords": ["redundant"]}
+{"id": "q13", "question": "Why should an agent loop have a maximum step count?", "relevant_docs": ["agents"], "answer_keywords": ["runaway"]}
+{"id": "q14", "question": "What is prompt injection and how do you defend against it?", "relevant_docs": ["agents"], "answer_keywords": ["data"]}
+{"id": "q15", "question": "What does mean reciprocal rank measure?", "relevant_docs": ["evaluation"], "answer_keywords": ["rank"]}
+{"id": "q16", "question": "What are the risks of using an LLM as a judge?", "relevant_docs": ["evaluation"], "answer_keywords": ["biased"]}
+{"id": "q17", "question": "What online signals do teams track after launch?", "relevant_docs": ["evaluation"], "answer_keywords": ["latency"]}
+{"id": "q18", "question": "What is the difference between short-term and long-term memory in LLM products?", "relevant_docs": ["personalization"], "answer_keywords": ["sessions"]}
+{"id": "q19", "question": "What is a filter bubble in personalized retrieval?", "relevant_docs": ["personalization"], "answer_keywords": ["one kind"]}
+{"id": "q20", "question": "How many words is a token on average?", "relevant_docs": ["transformers"], "answer_keywords": ["three quarters"]}
