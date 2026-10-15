@@ -62,7 +62,7 @@ flowchart LR
 ## Quickstart
 
 ```bash
-git clone https://github.com/<you>/grounded && cd grounded
+git clone https://github.com/VasireddyBhavana/llm-answer-engine && cd llm-answer-engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
