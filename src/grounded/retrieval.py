@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,7 +45,7 @@ class BM25Index:
         n = len(chunks)
         self.idf = {t: math.log(1 + (n - f + 0.5) / (f + 0.5)) for t, f in df.items()}
 
-    def search(self, query: str, k: int = 5) -> list[Hit]:
+    def search(self, query: str, k: int = 5, mask: np.ndarray | None = None) -> list[Hit]:
         q = tokenize(query, drop_stopwords=True)
         scores = np.zeros(len(self.chunks), dtype=np.float32)
         for t in set(q):
@@ -53,6 +54,8 @@ class BM25Index:
             tf = np.array([d.get(t, 0) for d in self.docs], dtype=np.float32)
             denom = tf + self.k1 * (1 - self.b + self.b * self.lens / max(self.avgdl, 1e-9))
             scores += self.idf[t] * tf * (self.k1 + 1) / np.where(denom == 0, 1, denom)
+        if mask is not None:
+            scores[~mask] = 0.0  # pre-filter: forbidden chunks can never be ranked
         order = np.argsort(-scores)[:k]
         return [Hit(self.chunks[i], float(scores[i]), "bm25") for i in order if scores[i] > 0]
 
@@ -66,13 +69,21 @@ class VectorIndex:
     def __init__(self, chunks: list[Chunk], embedder: Embedder,
                  vectors: np.ndarray | None = None):
         self.chunks, self.embedder = chunks, embedder
-        self.vectors = vectors if vectors is not None else embedder.embed([c.text for c in chunks])
+        if vectors is None:
+            vectors = (embedder.embed([c.text for c in chunks]) if chunks
+                       else np.zeros((0, getattr(embedder, "dim", 1) or 1), dtype=np.float32))
+        self.vectors = vectors
 
-    def search(self, query: str, k: int = 5) -> list[Hit]:
+    def search(self, query: str, k: int = 5, mask: np.ndarray | None = None) -> list[Hit]:
+        if not self.chunks:
+            return []
         q = self.embedder.embed([query])[0]
         sims = self.vectors @ q
+        if mask is not None:
+            sims = np.where(mask, sims, -np.inf)
         order = np.argsort(-sims)[:k]
-        return [Hit(self.chunks[i], float(sims[i]), "vector") for i in order]
+        return [Hit(self.chunks[i], float(sims[i]), "vector") for i in order
+                if np.isfinite(sims[i])]
 
 
 # --------------------------------------------------------------------------- Fusion + MMR
@@ -121,16 +132,37 @@ class Retriever:
         self.vector = VectorIndex(chunks, embedder, vectors)
         self._vec_by_id = {c.id: self.vector.vectors[i] for i, c in enumerate(chunks)}
 
+    def build_mask(self, allow: Callable[[Chunk], bool] | None = None,
+                   tags: list[str] | None = None,
+                   doc_ids: list[str] | None = None) -> np.ndarray | None:
+        """Boolean mask of chunks the caller may see AND that match the metadata filters.
+
+        Filtering happens *before* ranking (pre-filtering). Post-filtering a global top-k would
+        silently return fewer results for users with narrow access, and is one bug away from
+        leaking restricted text into the prompt.
+        """
+        if allow is None and not tags and not doc_ids:
+            return None
+        tagset, idset = set(tags or []), set(doc_ids or [])
+        return np.array([(allow is None or allow(c))
+                         and (not tagset or bool(tagset & set(c.tags)))
+                         and (not idset or c.doc_id in idset)
+                         for c in self.chunks], dtype=bool)
+
     def search(self, query: str, k: int = 4, mode: str = "hybrid", use_mmr: bool = False,
-               boost_docs: dict[str, float] | None = None, candidates: int = 20) -> list[Hit]:
-        """mode: 'bm25' | 'vector' | 'hybrid'. boost_docs: per-doc multipliers (personalization)."""
+               boost_docs: dict[str, float] | None = None, candidates: int = 20,
+               allow: Callable[[Chunk], bool] | None = None, tags: list[str] | None = None,
+               doc_ids: list[str] | None = None) -> list[Hit]:
+        """mode: 'bm25' | 'vector' | 'hybrid'. boost_docs: per-doc multipliers (personalization).
+        allow: access-control predicate per chunk. tags / doc_ids: metadata filters."""
+        mask = self.build_mask(allow, tags, doc_ids)
         if mode == "bm25":
-            hits = self.bm25.search(query, candidates)
+            hits = self.bm25.search(query, candidates, mask)
         elif mode == "vector":
-            hits = self.vector.search(query, candidates)
+            hits = self.vector.search(query, candidates, mask)
         elif mode == "hybrid":
-            hits = reciprocal_rank_fusion([self.bm25.search(query, candidates),
-                                           self.vector.search(query, candidates)])
+            hits = reciprocal_rank_fusion([self.bm25.search(query, candidates, mask),
+                                           self.vector.search(query, candidates, mask)])
         else:
             raise ValueError(f"unknown retrieval mode: {mode}")
 

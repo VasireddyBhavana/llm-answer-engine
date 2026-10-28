@@ -2,9 +2,7 @@ __pycache__/
 *.egg-info/
 .venv/
 .env
-.index/
-.traces/
-.memory/
+.grounded/
 reports/
 .pytest_cache/
 .ruff_cache/

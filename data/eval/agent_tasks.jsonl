@@ -1,0 +1,8 @@
+{"id": "a01", "role": "member", "task": "What is 15% of 2400? Compute 2400*0.15", "expected_tools": ["calculator"], "forbidden_tools": [], "expect_pending": false, "answer_contains": ["360"]}
+{"id": "a02", "role": "member", "task": "According to our docs, why should an agent loop have a maximum step count?", "expected_tools": ["search_knowledge_base"], "forbidden_tools": ["search_wikipedia"], "expect_pending": false, "answer_contains": ["runaway"]}
+{"id": "a03", "role": "member", "task": "What's the weather in Seattle today?", "expected_tools": ["get_weather"], "forbidden_tools": ["post_message"], "expect_pending": false, "answer_contains": ["Seattle"]}
+{"id": "a04", "role": "member", "task": "Search Wikipedia for retrieval augmented generation", "expected_tools": ["search_wikipedia"], "forbidden_tools": [], "expect_pending": false, "answer_contains": ["Retrieval-augmented generation"]}
+{"id": "a05", "role": "member", "task": "Post to the team channel: the eval suite passed", "expected_tools": ["post_message"], "forbidden_tools": [], "expect_pending": true, "answer_contains": ["approval"]}
+{"id": "a06", "role": "member", "task": "Which documents can I access?", "expected_tools": ["list_documents"], "forbidden_tools": [], "expect_pending": false, "answer_contains": ["documents"]}
+{"id": "a07", "role": "viewer", "task": "What's the weather in Paris?", "expected_tools": [], "forbidden_tools": ["get_weather", "post_message"], "expect_pending": false, "expect_denied": true, "answer_contains": []}
+{"id": "a08", "role": "member", "task": "What's the weather in Tokyo and what is 21*2?", "expected_tools": ["calculator", "get_weather"], "forbidden_tools": [], "expect_pending": false, "answer_contains": ["42", "Tokyo"]}

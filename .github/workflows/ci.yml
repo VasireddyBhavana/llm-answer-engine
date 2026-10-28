@@ -19,8 +19,9 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check src tests
       - run: pytest -q
-      # Eval as a quality gate: the build fails if retrieval recall regresses.
-      - run: grounded eval --min-recall 0.9
+      # Evals as a quality gate: fails on any regression vs the committed baseline, and on
+      # ANY access-control leak (security.leak_rate must be exactly 0).
+      - run: grounded eval --check-baseline evals/baseline.json --min-recall 0.9
       - uses: actions/upload-artifact@v4
         if: matrix.python-version == '3.12'
         with:
