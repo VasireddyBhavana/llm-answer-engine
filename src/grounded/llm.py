@@ -182,8 +182,9 @@ class MockLLM:
 
     It is NOT intelligent. It does just enough to exercise every code path:
       * RAG prompts  -> extracts context sentences that best overlap the question, with citations.
-      * Agent prompts -> calls `calculator` for arithmetic, `search_knowledge_base` for questions,
-                         then answers from the tool results.
+      * Agent prompts -> routes by keyword to the available tools (calculator, knowledge base,
+                         weather, Wikipedia, documents, messaging), then answers from results.
+      * Rerank prompts -> scores passages by best-sentence overlap with the query.
       * Judge prompts -> scores by word overlap between answer and context.
     Swap in a real provider with GROUNDED_LLM=anthropic or GROUNDED_LLM=openai.
     """
@@ -196,6 +197,9 @@ class MockLLM:
 
         if "JUDGE" in system:
             return LLMResponse(self._judge(prompt))
+
+        if "RERANK" in system:
+            return LLMResponse(self._rerank(prompt))
 
         if tools:
             return self._agent_step(messages, tools)
@@ -224,21 +228,45 @@ class MockLLM:
 
     # -- Agent -------------------------------------------------------------
     @staticmethod
+    def _plan(task: str, names: set[str]) -> list[tuple[str, dict[str, Any]]]:
+        """Keyword routing that imitates what a real model would decide from tool descriptions."""
+        plan: list[tuple[str, dict[str, Any]]] = []
+        low = task.lower()
+        math = MockLLM._find_arithmetic(task)
+        if math and "calculator" in names:
+            plan.append(("calculator", {"expression": math}))
+        if "get_weather" in names and re.search(r"\b(weather|forecast|temperature)\b", low):
+            m = re.search(r"\b(?:in|for|at)\s+([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*)", task)
+            plan.append(("get_weather", {"city": m.group(1) if m else "London"}))
+        if "search_wikipedia" in names and "wikipedia" in low:
+            m = re.search(r"wikipedia\s+(?:for|about|on)?\s*(.+?)(?:[?.!]|\s+and\s|$)", task,
+                          re.I)
+            plan.append(("search_wikipedia", {"query": (m.group(1) if m else task).strip()}))
+        if "list_documents" in names and re.search(
+                r"\b(which|what|list)\b.{0,20}\b(documents|docs|files)\b", low):
+            plan.append(("list_documents", {}))
+        if "post_message" in names and re.search(
+                r"\b(post|send|notify|message)\b.{0,40}\b(slack|team|channel|webhook)\b", low):
+            text = task.split(":", 1)[1].strip() if ":" in task else task
+            plan.append(("post_message", {"text": text}))
+        others = [n for n, _ in plan if n != "calculator"]
+        only_short_math = plan and not others and len(task) < len(math or "") + 25
+        wants_kb = re.search(r"\b(knowledge base|our docs|documents? say|policy|according)\b", low)
+        if "search_knowledge_base" in names and ((not plan) or wants_kb
+                                                 or (not others and not only_short_math)):
+            plan.append(("search_knowledge_base", {"query": task}))
+        return plan
+
+    @staticmethod
     def _agent_step(messages, tools) -> LLMResponse:
         names = {t.name for t in tools}
         user_q = next(m["content"] for m in messages if m["role"] == "user")
         tool_results = [m for m in messages if m["role"] == "tool"]
         used = {m["name"] for m in tool_results}
-        step = len(tool_results)
+        for name, args in MockLLM._plan(user_q, names):
+            if name not in used:
+                return LLMResponse("", [ToolCall(f"call_{len(tool_results)}", name, args)])
 
-        math = MockLLM._find_arithmetic(user_q)
-        if math and "calculator" in names and "calculator" not in used:
-            return LLMResponse("", [ToolCall(f"call_{step}", "calculator",
-                                             {"expression": math})])
-        if "search_knowledge_base" in names and "search_knowledge_base" not in used \
-                and not (math and len(user_q) < len(math) + 25):
-            return LLMResponse("", [ToolCall(f"call_{step}", "search_knowledge_base",
-                                             {"query": user_q})])
         parts = []
         for m in tool_results:
             content = re.sub(r"</?tool_output[^>]*>", "", m["content"]).strip()
@@ -247,6 +275,8 @@ class MockLLM:
             elif m["name"] == "search_knowledge_base":
                 parts.append(MockLLM._extractive_answer(
                     f"{content}<question>{user_q}</question>", n=1))
+            else:
+                parts.append(content.split("\n")[0][:300])
         return LLMResponse(" ".join(parts) or "I could not find an answer.")
 
     @staticmethod
@@ -262,6 +292,21 @@ class MockLLM:
         while expr.count(")") > expr.count("(") and expr.endswith(")"):
             expr = expr[:-1].strip()
         return expr
+
+    # -- Rerank ------------------------------------------------------------
+    @staticmethod
+    def _rerank(prompt: str) -> str:
+        query = prompt.split("<query>")[-1].split("</query>")[0]
+        q = set(tokenize(query, drop_stopwords=True))
+        passages = re.findall(r"<passage n=\"\d+\">(.*?)</passage>", prompt, re.S)
+        raw = []
+        for body in passages:
+            body = re.sub(r"^\s*\[[^\]]*\]\s*", "", body)  # ignore the chunk header
+            best = max((len(q & set(tokenize(s, drop_stopwords=True))) /
+                        (1 + len(s) / 400) for s in sentences(body)), default=0.0)
+            raw.append(best)
+        top = max(raw, default=0) or 1
+        return json.dumps({"scores": [round(10 * r / top, 2) for r in raw]})
 
     # -- Judge -------------------------------------------------------------
     @staticmethod

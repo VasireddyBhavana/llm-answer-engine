@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
@@ -14,6 +14,9 @@ class Chunk:
     title: str       # document title
     section: str     # nearest heading
     text: str
+    # Access control + filtering metadata, copied from the parent document.
+    groups: list[str] = field(default_factory=lambda: ["everyone"])
+    tags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)

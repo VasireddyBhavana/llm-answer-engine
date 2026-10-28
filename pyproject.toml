@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grounded"
-version = "0.1.0"
-description = "A small answer engine: hybrid RAG with citations, a tool-using agent, personalization and evals."
+version = "0.2.0"
+description = "Enterprise AI assistant: secure document ingestion, hybrid retrieval, tool calling, integrations, auth and automated evals."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -15,6 +15,10 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "pydantic>=2.6",
+    "python-multipart>=0.0.9",
+    "PyJWT>=2.8",
+    "pypdf>=4.0",
+    "python-docx>=1.1",
 ]
 
 [project.optional-dependencies]
